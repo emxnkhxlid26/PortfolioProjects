@@ -1,0 +1,134 @@
+SELECT *
+FROM CovidDeaths
+
+Select *
+FROM CovidVaccinations
+
+SELECT Location,date, total_cases, new_cases, total_deaths, population
+FROM CovidDeaths
+where continent is NOT NULL
+ORDER BY Location, date
+
+--Selecting the data we will be using
+SELECT location,date, total_cases, new_cases, total_deaths, population
+FROM CovidDeaths
+where continent is NOT NULL
+ORDER BY location
+
+--Looking at Total cases vs Total Deaths
+--On selected country
+SELECT location, date, total_cases, total_deaths, (cast(total_deaths as float) / NULLIF(cast(total_cases as float), 0))*100 AS DeathPercentage
+FROM CovidDeaths
+WHERE location like '%Kingdom%'
+and continent is NOT NULL
+ORDER BY location
+
+--Looking at TotalCases vs Population
+--Showing what percentage of population infected with COVID
+SELECT location, date, population, total_cases, (cast(total_cases as float) / cast(population as float)) *100 AS PercentagePopulation
+FROM CovidDeaths
+Where Continent is NOT NULL
+ORDER BY location
+
+--Looking for countries with highest infection rate compared to population
+SELECT location, population, MAX(total_cases) as HighestInfectionCount, MAX(cast(total_cases as float) / cast(population as float)) *100 AS PercentPopulationInfected
+FROM CovidDeaths
+GROUP BY location, population
+ORDER BY PercentPopulationInfected desc
+
+--Showing Countries with Highest Death count per Population
+SELECT location, MAX(CAST(total_deaths as float)) AS TotalDeathCount
+FROM CovidDeaths
+WHERE continent is NOT NULL
+GROUP BY location
+ORDER BY TotalDeathCount desc
+
+--Breaking down by Continent on the Total Death Count
+SELECT continent, MAX(CAST(total_deaths as float)) as TotalDeathCount
+FROM CovidDeaths
+WHERE continent is NOT NULL
+GROUP BY continent
+ORDER BY TotalDeathCount desc
+
+--GLOBAL NUMBERS
+SELECT SUM(CAST(new_cases as float)) as Total_Cases, SUM(CAST(new_deaths as float)) as TotalDeaths, 
+SUM(CAST(new_deaths as float))/NULLIF(SUM(CAST(new_cases as float)),0) *100 AS DeathPercentage
+FROM CovidDeaths
+WHERE continent is NOT NULL
+ORDER BY 1,2
+
+--Looking at Total Population vs Vaccinations
+-- Shows Percentage of Population that has recieved at least one Covid Vaccine
+SELECT 
+dea.continent, 
+dea.location, 
+dea.date, 
+dea.population, 
+vac.new_vaccinations,
+SUM(CAST(vac.new_vaccinations as float)) OVER (PARTITION BY dea.location Order by dea.location, dea.date) AS RollingPeopleVaccinated
+FROM CovidDeaths dea
+JOIN CovidVaccination vac
+ON dea.location = vac.location
+and dea.date = vac.date
+where dea.continent is NOT NULL
+ORDER BY 2,3
+
+-- Using CTE to perfom calculation on partition by in previous query
+With PopvsVac (Continent, Location, Date, Population, New_Vaccinations, RollingPeopleVaccinated)
+as
+(
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(float,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From CovidDeaths dea
+Join CovidVaccination vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null 
+--order by 2,3
+)
+Select *, (RollingPeopleVaccinated/Population)*100
+From PopvsVac
+
+-- Using Temp Table to perform Calculation on Partition By in previous query
+
+DROP Table if exists #PercentPopulationVaccinated
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+date nvarchar(255),
+Population float,
+New_vaccinations float,
+RollingPeopleVaccinated float
+)
+
+Insert into #PercentPopulationVaccinated
+Select dea.continent, 
+dea.location, 
+dea.date,
+dea.population, 
+vac.new_vaccinations, 
+SUM(CONVERT(float,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From CovidDeaths dea
+Join CovidVaccinations vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+--where dea.continent is not null 
+--order by 2,3
+
+Select *, (RollingPeopleVaccinated/Population)*100 as PercentPopulationVaccinated
+From #PercentPopulationVaccinated
+
+-- Creating View to store data for later visualizations
+
+CREATE VIEW PercentPopulationVaccinated as
+Select dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(float,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+--, (RollingPeopleVaccinated/population)*100
+From CovidDeaths dea
+Join CovidVaccinations vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+where dea.continent is not null 
