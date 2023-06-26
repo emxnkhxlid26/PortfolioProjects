@@ -1,0 +1,73 @@
+# The Biopython assignment code 
+
+from Bio import SeqIO
+from Bio import Entrez
+
+Entrez.email = "2406092@dundee.ac.uk"
+# Importing Seq with a user prompt of SeqID input 
+with Entrez.efetch(db = "nucleotide", rettype = 'gbwithparts', 
+                   retmode ='text', 
+                   id = input('Enter a SeqID such as "nc_003197" ') )as handle:
+    seq_record = SeqIO.read(handle,'gb')
+    
+print('------------------------------------')    
+print(seq_record.description)
+
+# fetching all of the genes in the seq
+gene = [f for f in seq_record.features if f.type == 'gene']       
+# setting up gene count as dictionary        
+gene_count = {}
+for g in gene:
+    genes =str(g.extract(seq_record).translate().seq)
+    # using len(genes) in order to record the legnth 
+    # of the genes and not the genes as string
+    gene_count[len(genes)] = gene_count.get(genes, 0) +1
+    
+    
+print('------------------------------------')
+# Smallest gene length 
+print('The shortest gene is ',min(gene_count,key=lambda x: gene_count[x]), 'long')
+# Maximum gene length 
+print('The longest gene is ',max(gene_countkey=lambda x: gene_count[x]), 'long')
+# The average gene length 
+print('The average length of the genes is: ',sum(gene_count) / len(gene_count))
+print('------------------------------------')
+
+# The following code prints code of the genes  
+#gene_seq = [k for k in seq_record.features if k.type == 'gene']               
+#gene_seq_output = {}
+#for l in gene_seq:
+    #genes_seq =str(g.extract(seq_record).translate().seq)
+    #gene_seq_output[(genes_seq)] = gene_seq_output.get(genes_seq, 0) +1
+    #print(gene_seq_output)
+
+
+
+# reports the most common amino acid in CDS in the organism
+cds = [f for f in seq_record.features if f.type == 'CDS']
+aacount = {}
+for c in cds:
+    aa =str(c.extract(seq_record).translate().seq)[1]
+    aacount[aa] = aacount.get(aa, 0) +1
+print(aacount)
+# reports the most frequent amino acid 
+maxaa = max(aacount, key=lambda x: aacount[x])
+print('the most frequent Amino Acid is {} with a count of {}'.format(
+    maxaa,aacount[maxaa]))
+print('------------------------------------') 
+
+
+def saving_data():
+    '''This function will prompt for input inorder to save 
+    data in two format options; fasta & genbank'''
+    s = str(input('Enter f to save as fasta, g to save as genbank or Other to not save the Seq '))
+    if s == 'f':
+        SeqIO.write(seq_record,"Sequence_record.fasta","fasta")
+        print('The sequence file has been saved as "Sequence_record.fasta" ')
+    elif s == 'g':
+        SeqIO.write(seq_record,"Sequence_record.gb","gb")
+        print('The sequence file has been saved as "Sequence_record.gb" ')
+    else:
+        print('The file has not been saved ')
+    
+saving_data()
